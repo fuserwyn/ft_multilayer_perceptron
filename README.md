@@ -1,387 +1,95 @@
-# Perceptron MLP для классификации рака груди
+# Multilayer Perceptron
 
-Проект по реализации многослойного перцептрона (MLP) с нуля для бинарной классификации рака груди на основе датасета Wisconsin Breast Cancer.
+A multilayer perceptron written from scratch with numpy. It classifies breast
+tumours as malignant (**M**) or benign (**B**) using the Wisconsin Breast Cancer dataset.
 
-## Структура проекта
+## Files
 
-```
-perceptron/
-├── data.csv                    # Исходные данные
-├── Makefile                    # Makefile для запуска всех команд
-├── prepare_data.py             # Шаг 1: Подготовка и анализ данных
-├── split_data.py               # Шаг 2: Разделение и нормализация
-├── train_mlp.py                # Шаг 3: Обучение MLP
-├── predict.py                  # Шаг 4: Предсказания
-├── test_mlp.py                 # Тесты для проверки реализации
-├── mlp_model.npz               # Обученная модель
-├── training_history.png         # График обучения
-└── README.md                   # Этот файл
-```
+| file | purpose |
+|---|---|
+| `mlp.py` | core: activations, softmax, losses, `MLP` class (feedforward, backprop, gradient descent, save/load) |
+| `split_data.py` | **program 1**: splits `data.csv` into `data_train.csv` and `data_valid.csv` (stratified, seeded) |
+| `train_mlp.py` | **program 2**: trains the model, prints metrics every epoch, saves the model, shows the learning curves |
+| `predict.py` | **program 3**: loads the model, predicts on a given CSV and computes the binary cross-entropy |
+| `prepare_data.py` | dataset exploration (optional) |
+| `test_mlp.py` | unit tests, including a numerical gradient check |
 
-## Архитектура MLP
-
-- **Входной слой**: 30 признаков
-- **Скрытые слои**: [64, 32] нейронов
-- **Выходной слой**: 1 нейрон (бинарная классификация)
-- **Всего параметров**: 4,097
-- **Функция активации**: Sigmoid
-- **Функция потерь**: Binary Cross-Entropy
-
-## Использование
-
-### Быстрый старт с Makefile
-
-Все команды можно запускать через Makefile:
+## Usage
 
 ```bash
-# Показать все доступные команды
-make help
-
-# Установить зависимости
-make install
-
-# Запустить полный pipeline (все шаги)
-make pipeline
-
-# Или запускать по шагам:
-make prepare    # Шаг 1: Подготовка данных
-make split      # Шаг 2: Разделение и нормализация
-make train      # Шаг 3: Обучение модели
-make predict    # Шаг 4: Предсказания
-make test       # Запустить тесты
-
-# Очистка сгенерированных файлов
-make clean      # Удалить данные (но оставить модель)
-make clean-all  # Удалить все включая модель
-```
-
-### Детальное описание шагов
-
-#### 1. Подготовка данных
-```bash
-make prepare
-# или
-python3 prepare_data.py
-```
-Анализирует данные, проверяет распределение классов и подготавливает признаки.
-
-#### 2. Разделение и нормализация
-```bash
-make split
-# или
-python3 split_data.py
-```
-Разделяет данные на обучающую (80%) и валидационную (20%) выборки с сохранением распределения классов. Нормализует признаки используя StandardScaler (z-score normalization).
-
-#### 3. Обучение модели
-```bash
-make train
-# или
-python3 train_mlp.py
-# или с кастомными параметрами:
-python3 train_mlp.py --hidden 128 64 32 --epochs 500 --batch-size 16 --learning-rate 0.001
-```
-Обучает MLP с нуля:
-- 1000 эпох (по умолчанию)
-- Размер батча: 32 (по умолчанию)
-- Learning rate: 0.01 (по умолчанию)
-- Мини-батч градиентный спуск
-- Обратное распространение ошибки
-
-**Результаты обучения:**
-- Точность на обучении: **98.68%**
-- Точность на валидации: **96.46%**
-
-#### 4. Предсказания
-```bash
-make predict
-# или
-python3 predict.py
-```
-Загружает обученную модель и демонстрирует предсказания на валидационной выборке.
-
-#### 5. Тестирование
-```bash
+make install        # numpy, pandas, matplotlib
+make split          # or: python3 split_data.py --dataset data.csv --valid_ratio 0.2 --seed 42
+make train          # or: python3 train_mlp.py
+make predict        # or: python3 predict.py --model saved_model.npz --dataset data_valid.csv
 make test
-# или
-python3 test_mlp.py
-```
-Запускает unit-тесты для проверки корректности реализации.
-
-## Реализация
-
-Все компоненты реализованы с нуля на NumPy:
-- ✅ Прямое распространение (forward propagation)
-- ✅ Обратное распространение (backward propagation)
-- ✅ Обновление весов (gradient descent)
-- ✅ Мини-батч обучение
-- ✅ Визуализация процесса обучения
-
-## Файлы данных
-
-После выполнения скриптов создаются следующие файлы:
-
-**Данные:**
-- `X_train.npy` - нормализованные признаки для обучения
-- `X_val.npy` - нормализованные признаки для валидации
-- `y_train.npy` - метки для обучения
-- `y_val.npy` - метки для валидации
-
-**Параметры нормализации:**
-- `train_mean.npy` - средние значения признаков
-- `train_std.npy` - стандартные отклонения признаков
-
-**Модель:**
-- `mlp_model.npz` - обученные веса и смещения
-
-**Визуализация:**
-- `training_history.png` - график потерь и точности
-
-## Зависимости
-
-```python
-numpy
-pandas
-matplotlib
 ```
 
-Установка:
-```bash
-pip install numpy pandas matplotlib
-```
-
-## Особенности реализации
-
-1. **Стратифицированное разделение**: Сохраняет распределение классов в обучающей и валидационной выборках
-2. **Правильная нормализация**: Использует параметры только из обучающей выборки для нормализации валидационной
-3. **Xavier инициализация**: Веса инициализируются для лучшей сходимости
-4. **Защита от переполнения**: Обрезка значений в sigmoid функции
-5. **Визуализация**: Автоматическое создание графиков обучения
-
-## Результаты
-
-Модель достигла высокой точности классификации:
-- **96.46%** на валидационной выборке
-- Хорошая обобщающая способность (разница между train и validation < 3%)
-
-## Тестирование
-
-Запуск тестов для проверки корректности реализации:
+The architecture and hyper-parameters are set with arguments (at least 2 hidden layers):
 
 ```bash
-python3 test_mlp.py
+python3 train_mlp.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy \
+                     --batch_size 8 --learning_rate 0.0314 --activation sigmoid
+# --activation sigmoid|tanh|relu   --weights_init heUniform|heNormal|xavierUniform
+# --no_show   save the plot without opening a window
+make train ARGS="--layer 32 16 --activation relu"
 ```
 
-Тесты проверяют:
-- ✅ Функцию активации sigmoid и её производную
-- ✅ Инициализацию MLP (размеры весов и смещений)
-- ✅ Прямое распространение (forward propagation)
-- ✅ Обратное распространение (backward propagation)
-- ✅ Обновление весов (gradient descent)
-- ✅ Функцию потерь (binary cross-entropy)
-- ✅ Предсказания и точность
-- ✅ Воспроизводимость результатов
+`predict.py -v` prints every prediction, and `--output preds.csv` writes them to a file.
 
-## Защита проекта
+### What `saved_model.npz` contains
+- the topology: layer sizes, hidden activation, softmax output, weight initialiser, classes;
+- the weights `W0..Wn` and biases `b0..bn`;
+- the normalisation `mean` and `std`, computed on the **training set only**.
 
-### Подготовка к защите
+## Results (defaults: 30 → 24 → 24 → 2, sigmoid, lr 0.0314, batch 8, 70 epochs)
 
-1. **Запустите все скрипты по порядку:**
-   ```bash
-   python3 prepare_data.py
-   python3 split_data.py
-   python3 train_mlp.py
-   python3 predict.py
-   python3 test_mlp.py
-   ```
-
-2. **Подготовьте объяснения ключевых концепций:**
-   - Feedforward (прямое распространение)
-   - Backpropagation (обратное распространение)
-   - Gradient Descent (градиентный спуск)
-
-3. **Изучите код:**
-   - Знайте, где находится каждая функция
-   - Понимайте размерности матриц и векторов
-   - Уметь объяснить формулы
-
-### Ключевые концепции для объяснения
-
-#### 1. Feedforward (Прямое распространение)
-
-**Что это:**
-Процесс передачи данных от входного слоя через скрытые слои к выходному слою.
-
-**Как работает:**
-1. Для каждого слоя вычисляется взвешенная сумма:
-   ```
-   z = X · W + b
-   ```
-   где:
-   - `X` - входные данные (или активации предыдущего слоя)
-   - `W` - матрица весов
-   - `b` - вектор смещений (bias)
-
-2. Применяется функция активации (sigmoid):
-   ```
-   a = σ(z) = 1 / (1 + e^(-z))
-   ```
-
-3. Результат становится входом для следующего слоя.
-
-**В коде:**
-- Файл: `train_mlp.py`
-- Метод: `MLP.forward()` (строки 74-92)
-- Формула: `z = np.dot(activations[-1], self.weights[i]) + self.biases[i]`
-- Активация: `a = self.sigmoid(z)`
-
-**Пример объяснения:**
-"Прямое распространение - это процесс, когда данные проходят через сеть слева направо. На каждом слое мы умножаем входные данные на матрицу весов, добавляем смещения и применяем функцию активации sigmoid. Это позволяет сети преобразовывать входные признаки в предсказание."
-
-#### 2. Backpropagation (Обратное распространение)
-
-**Что это:**
-Алгоритм вычисления градиентов функции потерь по всем весам сети, используя цепное правило дифференцирования.
-
-**Как работает:**
-1. **Вычисляем ошибку на выходном слое:**
-   ```
-   δ_output = y_pred - y_true
-   ```
-
-2. **Распространяем ошибку назад через скрытые слои:**
-   ```
-   δ_hidden = δ_next · W^T · σ'(z)
-   ```
-   где `σ'(z)` - производная функции активации
-
-3. **Вычисляем градиенты весов и смещений:**
-   ```
-   ∇W = (1/m) · X^T · δ
-   ∇b = (1/m) · sum(δ)
-   ```
-
-**В коде:**
-- Файл: `train_mlp.py`
-- Метод: `MLP.backward()` (строки 94-123)
-- Ключевая формула: `d_error = np.dot(d_error, self.weights[i+1].T) * self.sigmoid_derivative(self.z_values[i])`
-
-**Пример объяснения:**
-"Обратное распространение начинается с вычисления ошибки на выходном слое - разницы между предсказанием и истинным значением. Затем мы распространяем эту ошибку назад через сеть, используя цепное правило. На каждом слое мы вычисляем, насколько каждый вес влияет на итоговую ошибку. Это дает нам градиенты - направление, в котором нужно изменить веса, чтобы уменьшить ошибку."
-
-#### 3. Gradient Descent (Градиентный спуск)
-
-**Что это:**
-Оптимизационный алгоритм для минимизации функции потерь путем обновления весов в направлении, противоположном градиенту.
-
-**Как работает:**
-1. Вычисляем градиенты через backpropagation
-2. Обновляем веса:
-   ```
-   W_new = W_old - learning_rate · ∇W
-   b_new = b_old - learning_rate · ∇b
-   ```
-3. Повторяем для всех весов и смещений
-
-**В коде:**
-- Файл: `train_mlp.py`
-- Метод: `MLP.update_weights()` (строки 125-129)
-- Формула: `self.weights[i] -= self.learning_rate * gradients_w[i]`
-
-**Параметры:**
-- **Learning rate (скорость обучения)**: Контролирует размер шага обновления
-  - Слишком большой → может "перепрыгнуть" минимум
-  - Слишком маленький → медленная сходимость
-  - В проекте: `0.01`
-
-**Пример объяснения:**
-"Градиентный спуск - это процесс обновления весов. После того как мы вычислили градиенты через backpropagation, мы знаем направление, в котором нужно изменить веса. Мы делаем небольшой шаг в этом направлении, умноженный на learning rate. Это позволяет нам постепенно приближаться к оптимальным значениям весов, которые минимизируют ошибку."
-
-### Типичные вопросы на защите
-
-1. **"Почему используется sigmoid функция?"**
-   - Ограничивает выход в диапазоне [0, 1]
-   - Подходит для бинарной классификации (вероятность)
-   - Имеет гладкую производную для backpropagation
-
-2. **"Что такое bias (смещение)?"**
-   - Дополнительный параметр, позволяющий сдвигать функцию активации
-   - Позволяет модели лучше подстраиваться под данные
-   - Аналогично свободному члену в линейной регрессии
-
-3. **"Почему минимум 2 скрытых слоя?"**
-   - Требование задания
-   - Позволяет модели изучать более сложные паттерны
-   - Первый слой - простые признаки, второй - их комбинации
-
-4. **"Как работает нормализация?"**
-   - StandardScaler: `z = (x - mean) / std`
-   - Приводит признаки к единому масштабу
-   - Важно: используем параметры только из обучающей выборки!
-
-5. **"Что такое binary cross-entropy?"**
-   - Функция потерь для бинарной классификации
-   - Формула: `E = -1/N * Σ[y*log(p) + (1-y)*log(1-p)]`
-   - Штрафует уверенные неправильные предсказания сильнее
-
-### Демонстрация на защите
-
-1. **Покажите структуру проекта:**
-   ```bash
-   ls -la
-   ```
-
-2. **Запустите тесты:**
-   ```bash
-   python3 test_mlp.py
-   ```
-
-3. **Покажите график обучения:**
-   ```bash
-   open training_history.png  # или xdg-open на Linux
-   ```
-
-4. **Объясните архитектуру:**
-   - Покажите размеры весов: `print(mlp.weights[0].shape)`
-   - Объясните поток данных через слои
-
-5. **Покажите результаты:**
-   - Точность на валидации: 96.46%
-   - График показывает сходимость модели
-
-### Полезные команды для демонстрации
-
-```python
-# В Python интерактивном режиме
-import numpy as np
-from train_mlp import MLP
-
-# Создать простую модель для демонстрации
-mlp = MLP(3, [2], 1, seed=42)
-print("Архитектура:")
-print(f"Веса слоя 1: {mlp.weights[0].shape}")
-print(f"Веса слоя 2: {mlp.weights[1].shape}")
-
-# Показать forward pass
-X = np.array([[1.0, 2.0, 3.0]])
-output = mlp.forward(X)
-print(f"Вход: {X}")
-print(f"Выход: {output}")
+```
+epoch 70/70 - loss: 0.0480 - val_loss: 0.0872 - acc: 0.9912 - val_acc: 0.9735
+binary cross-entropy : 0.0872      accuracy : 0.9735 (110/113)
 ```
 
-### Чеклист перед защитой
+---
 
-- [ ] Все скрипты запускаются без ошибок
-- [ ] Тесты проходят успешно
-- [ ] Модель обучена и сохранена
-- [ ] График обучения создан
-- [ ] Понимаю код forward propagation
-- [ ] Понимаю код backward propagation
-- [ ] Понимаю код gradient descent
-- [ ] Могу объяснить формулы
-- [ ] Знаю размерности всех матриц
-- [ ] Подготовил примеры для демонстрации
+## Evaluation cheat sheet
 
-## Автор
+Notation: a batch `X` has shape `(m, 30)`; layer `l` has `W[l]` of shape `(n_in, n_out)` and `b[l]` of shape `(1, n_out)`.
 
-Проект выполнен в рамках курса IT 42.
+### Feedforward (`MLP.forward`)
+The data flows through the network layer by layer:
+```
+Z[l] = A[l-1] · W[l] + b[l]        weighted sum (+ bias)
+A[l] = f(Z[l])                      activation (sigmoid / tanh / relu)
+P    = softmax(Z[last])             output: probability distribution over {B, M}
+softmax(z)_k = e^{z_k} / Σ_j e^{z_j}     (max(z) is subtracted before exp to avoid overflow)
+```
+Every `Z` and `A` is cached, because backprop needs them.
+
+### Loss function
+Categorical cross-entropy: `L = -1/m Σ Σ_k Y_k log P_k`, where `Y` holds one-hot labels.
+With two classes this is identical to the subject's binary cross-entropy with `p = P(M)`
+(checked by `test_losses`).
+
+### Backpropagation (`MLP.backward`)
+The chain rule, applied from the output back to the input.
+1. Output layer. For softmax + cross-entropy the derivative simplifies to **`dZ = (P − Y) / m`**.
+2. For each layer, from the last to the first:
+```
+dW[l] = A[l-1]ᵀ · dZ          how much each weight contributes to the error
+db[l] = Σ_batch dZ
+dA    = dZ · W[l]ᵀ             pass the error down to the previous layer
+dZ    = dA ⊙ f'(Z[l-1])        multiply by the activation derivative
+```
+`test_gradient_check` verifies the gradients against `(L(w+ε) − L(w−ε)) / 2ε`.
+
+### Gradient descent (`MLP.step` + the loop in `train_mlp.py`)
+`W ← W − lr · dW`, `b ← b − lr · db`. The gradient points towards increasing error, so we step the opposite way.
+Training uses **mini-batches**: each epoch the data is shuffled and cut into batches of `batch_size`, and the weights are updated after every batch.
+- If `lr` is too large, training diverges or oscillates; if it is too small, training is slow.
+- An epoch is one full pass over the training set.
+
+### Common questions
+- **Why a bias?** It shifts the activation threshold; without it the separating hyperplane always passes through 0.
+- **Why not initialise the weights to zero?** Every neuron in a layer would be identical and receive identical gradients, so the symmetry never breaks. He: `U(±√(6/n_in))`, Xavier: `U(±√(6/(n_in+n_out)))`.
+- **Why normalise?** Features have very different scales (area ~1000, smoothness ~0.1), which unbalances the gradients. mean and std come from the training set only, otherwise information from the validation set leaks into the model.
+- **Why a validation set?** To measure performance on data the model has never seen. If the training loss keeps falling while the validation loss rises, the model is overfitting.
+- **Why softmax?** It turns the output into a probability distribution (non-negative, sums to 1), and combined with cross-entropy it gives the simple gradient `P − Y`.

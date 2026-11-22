@@ -1,93 +1,59 @@
-# Makefile for Multilayer Perceptron Project
-# All commands for running the MLP training pipeline
+# Multilayer Perceptron
+# Targets rebuild only what is out of date: changing the dataset re-splits,
+# changing the split or the model code retrains.
 
-.PHONY: all prepare split train predict test clean help install
+PYTHON  ?= python3
+DATASET ?= data.csv
+SEED    ?= 42
+ARGS    ?=
 
-# Default target
-all: help
+TRAIN_CSV = data_train.csv
+VALID_CSV = data_valid.csv
+MODEL     = saved_model.npz
 
-# Install dependencies
+.PHONY: all install explore split train predict test clean fclean re help
+
+all: predict
+
 install:
-	@echo "Installing dependencies..."
-	pip install numpy pandas matplotlib
+	$(PYTHON) -m pip install numpy pandas matplotlib
 
-# Step 1: Prepare and explore data
-prepare:
-	@echo "============================================================"
-	@echo "STEP 1: DATA PREPARATION"
-	@echo "============================================================"
-	python3 prepare_data.py
+explore:
+	$(PYTHON) prepare_data.py
 
-# Step 2: Split data and normalize
-split: prepare
-	@echo "============================================================"
-	@echo "STEP 2: DATA SPLITTING AND NORMALIZATION"
-	@echo "============================================================"
-	python3 split_data.py
+$(TRAIN_CSV): $(DATASET) split_data.py mlp.py
+	$(PYTHON) split_data.py --dataset $(DATASET) --seed $(SEED)
 
-# Step 3: Train MLP model
-train: split
-	@echo "============================================================"
-	@echo "STEP 3: MLP TRAINING"
-	@echo "============================================================"
-	python3 train_mlp.py
+$(VALID_CSV): $(TRAIN_CSV)
 
-# Step 4: Make predictions
-predict: train
-	@echo "============================================================"
-	@echo "STEP 4: PREDICTIONS"
-	@echo "============================================================"
-	python3 predict.py
+split: $(TRAIN_CSV)
 
-# Run all tests
+$(MODEL): $(TRAIN_CSV) $(VALID_CSV) train_mlp.py mlp.py
+	$(PYTHON) train_mlp.py --train $(TRAIN_CSV) --valid $(VALID_CSV) --seed $(SEED) --model $(MODEL) $(ARGS)
+
+# `make train` always retrains (handy to try other hyper-parameters through ARGS)
+train: $(TRAIN_CSV)
+	$(PYTHON) train_mlp.py --train $(TRAIN_CSV) --valid $(VALID_CSV) --seed $(SEED) --model $(MODEL) $(ARGS)
+
+predict: $(MODEL)
+	$(PYTHON) predict.py --model $(MODEL) --dataset $(VALID_CSV)
+
 test:
-	@echo "============================================================"
-	@echo "RUNNING TESTS"
-	@echo "============================================================"
-	python3 test_mlp.py
+	$(PYTHON) test_mlp.py
 
-# Run full pipeline (prepare -> split -> train -> predict)
-pipeline: predict
-	@echo "============================================================"
-	@echo "FULL PIPELINE COMPLETED!"
-	@echo "============================================================"
-
-# Clean generated files
 clean:
-	@echo "Cleaning generated files..."
-	rm -f X_train.npy X_val.npy y_train.npy y_val.npy
-	rm -f train_mean.npy train_std.npy
-	rm -f mlp_model.npz mlp_weights.npy
-	rm -f training_history.png
-	rm -rf __pycache__/
-	@echo "Clean completed!"
+	rm -rf __pycache__ learning_curves.png
 
-# Clean all including model
-clean-all: clean
-	@echo "Cleaning model files..."
-	rm -f mlp_model.npz
+fclean: clean
+	rm -f $(TRAIN_CSV) $(VALID_CSV) $(MODEL)
 
-# Help message
+re: fclean all
+
 help:
-	@echo "============================================================"
-	@echo "Multilayer Perceptron - Makefile Commands"
-	@echo "============================================================"
-	@echo ""
-	@echo "Available targets:"
-	@echo "  make install      - Install required dependencies"
-	@echo "  make prepare      - Step 1: Prepare and explore data"
-	@echo "  make split        - Step 2: Split data and normalize"
-	@echo "  make train        - Step 3: Train MLP model"
-	@echo "  make predict      - Step 4: Make predictions"
-	@echo "  make test         - Run unit tests"
-	@echo "  make pipeline     - Run full pipeline (all steps)"
-	@echo "  make clean        - Remove generated data files"
-	@echo "  make clean-all    - Remove all generated files including model"
-	@echo "  make help         - Show this help message"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make pipeline     - Run complete pipeline"
-	@echo "  make train        - Train model (requires split step first)"
-	@echo "  make test         - Run tests"
-	@echo ""
-
+	@echo "make install   install numpy, pandas, matplotlib"
+	@echo "make explore   print a quick analysis of the dataset"
+	@echo "make split     data.csv -> data_train.csv + data_valid.csv"
+	@echo "make train     train and save saved_model.npz   (ARGS='--layer 24 24 24 --epochs 84')"
+	@echo "make predict   evaluate the model on data_valid.csv"
+	@echo "make test      unit tests + gradient check"
+	@echo "make fclean    remove every generated file"

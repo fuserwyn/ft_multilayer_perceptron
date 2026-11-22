@@ -1,140 +1,67 @@
 """
-Data splitting and normalization script
-Step 2: Split dataset into train/validation and normalize features
+Program 1/3: split the raw dataset into a training part and a validation part.
+
+The split is stratified (same M/B ratio in both parts) and reproducible with --seed.
+Output files keep the original raw format (no header, 32 columns), so the
+normalisation is learned later, by the training program, on the training part only.
+
+    python3 split_data.py --dataset data.csv --valid_ratio 0.2 --seed 42
 """
 
-import pandas as pd
+import argparse
+import os
+import sys
+
 import numpy as np
 
-# Column names according to the standard Wisconsin Breast Cancer dataset
-columns = [
-    'id', 'diagnosis',
-    'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean', 'smoothness_mean',
-    'compactness_mean', 'concavity_mean', 'concave_points_mean', 'symmetry_mean',
-    'fractal_dimension_mean',
-    'radius_se', 'texture_se', 'perimeter_se', 'area_se', 'smoothness_se',
-    'compactness_se', 'concavity_se', 'concave_points_se', 'symmetry_se',
-    'fractal_dimension_se',
-    'radius_worst', 'texture_worst', 'perimeter_worst', 'area_worst',
-    'smoothness_worst', 'compactness_worst', 'concavity_worst',
-    'concave_points_worst', 'symmetry_worst', 'fractal_dimension_worst'
-]
+from mlp import read_csv
 
-print("=" * 60)
-print("STEP 2: DATA SPLITTING AND NORMALIZATION")
-print("=" * 60)
 
-# Load and prepare data
-print("\n1. Loading data from data.csv...")
-df = pd.read_csv('data.csv', header=None, names=columns)
+def stratified_split(labels, valid_ratio, seed):
+    rng = np.random.default_rng(seed)
+    train_idx, valid_idx = [], []
+    for cls in np.unique(labels):
+        idx = np.flatnonzero(labels == cls)
+        rng.shuffle(idx)
+        n_valid = int(round(len(idx) * valid_ratio))
+        valid_idx.append(idx[:n_valid])
+        train_idx.append(idx[n_valid:])
+    train_idx = rng.permutation(np.concatenate(train_idx))
+    valid_idx = rng.permutation(np.concatenate(valid_idx))
+    return train_idx, valid_idx
 
-# Encode diagnosis: M -> 1, B -> 0
-df['target'] = (df['diagnosis'] == 'M').astype(int)
 
-# Separate features and target
-X = df.drop(columns=['id', 'diagnosis', 'target']).values
-y = df['target'].values
+def main():
+    parser = argparse.ArgumentParser(description='Split the dataset into train / validation CSV files.')
+    parser.add_argument('--dataset', default='data.csv', help='raw dataset (default: data.csv)')
+    parser.add_argument('--valid_ratio', '--valid-ratio', type=float, default=0.2,
+                        help='fraction of examples used for validation (default: 0.2)')
+    parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
+    parser.add_argument('--out_dir', '--out-dir', default='.', help='output directory (default: .)')
+    args = parser.parse_args()
 
-print(f"   Original data shape: X={X.shape}, y={y.shape}")
+    if not 0.0 < args.valid_ratio < 1.0:
+        parser.error('--valid_ratio must be in (0, 1)')
 
-# Split into train and validation sets
-print("\n2. Splitting into train/validation sets (80/20)...")
-SEED = 42  # For reproducibility
-test_size = 0.2
+    try:
+        df = read_csv(args.dataset)
+    except (OSError, ValueError) as e:
+        sys.exit(f'error: {e}')
 
-# Manual stratified split to preserve class distribution
-np.random.seed(SEED)
-indices = np.arange(len(X))
+    train_idx, valid_idx = stratified_split(df['diagnosis'].to_numpy(), args.valid_ratio, args.seed)
+    train, valid = df.iloc[train_idx], df.iloc[valid_idx]
 
-# Separate indices by class for stratified split
-class_0_indices = indices[y == 0]
-class_1_indices = indices[y == 1]
+    os.makedirs(args.out_dir, exist_ok=True)
+    train_path = os.path.join(args.out_dir, 'data_train.csv')
+    valid_path = os.path.join(args.out_dir, 'data_valid.csv')
+    train.to_csv(train_path, header=False, index=False)
+    valid.to_csv(valid_path, header=False, index=False)
 
-# Shuffle each class separately
-np.random.shuffle(class_0_indices)
-np.random.shuffle(class_1_indices)
+    for name, part, path in (('train', train, train_path), ('valid', valid, valid_path)):
+        counts = part['diagnosis'].value_counts()
+        print(f'{name:<5}: {len(part):>3} examples  (M: {counts.get("M", 0)}, B: {counts.get("B", 0)})'
+              f'  -> {path}')
 
-# Calculate split sizes for each class
-n_val_0 = int(len(class_0_indices) * test_size)
-n_val_1 = int(len(class_1_indices) * test_size)
 
-# Split indices
-val_indices = np.concatenate([
-    class_0_indices[:n_val_0],
-    class_1_indices[:n_val_1]
-])
-train_indices = np.concatenate([
-    class_0_indices[n_val_0:],
-    class_1_indices[n_val_1:]
-])
-
-# Shuffle final indices
-np.random.shuffle(val_indices)
-np.random.shuffle(train_indices)
-
-# Create splits
-X_train, X_val = X[train_indices], X[val_indices]
-y_train, y_val = y[train_indices], y[val_indices]
-
-print(f"   Train set: X_train={X_train.shape}, y_train={y_train.shape}")
-print(f"   Validation set: X_val={X_val.shape}, y_val={y_val.shape}")
-
-# Check class distribution in both sets
-print(f"\n   Train labels distribution:")
-unique, counts = np.unique(y_train, return_counts=True)
-for label, count in zip(unique, counts):
-    print(f"      Class {label}: {count} samples ({count/len(y_train)*100:.1f}%)")
-
-print(f"   Validation labels distribution:")
-unique, counts = np.unique(y_val, return_counts=True)
-for label, count in zip(unique, counts):
-    print(f"      Class {label}: {count} samples ({count/len(y_val)*100:.1f}%)")
-
-# Normalize features using StandardScaler (z-score normalization)
-print("\n3. Normalizing features using StandardScaler...")
-print("   Formula: z = (x - mean) / std")
-
-# Calculate mean and std from TRAIN set only (important!)
-train_mean = X_train.mean(axis=0)
-train_std = X_train.std(axis=0)
-
-# Avoid division by zero
-train_std = np.where(train_std == 0, 1, train_std)
-
-print(f"   Train set - Mean range: [{train_mean.min():.2f}, {train_mean.max():.2f}]")
-print(f"   Train set - Std range: [{train_std.min():.2f}, {train_std.max():.2f}]")
-
-# Normalize train set
-X_train_norm = (X_train - train_mean) / train_std
-
-# Normalize validation set using SAME mean and std from train set
-X_val_norm = (X_val - train_mean) / train_std
-
-print(f"\n   After normalization:")
-print(f"   X_train_norm: mean={X_train_norm.mean(axis=0).mean():.6f}, std={X_train_norm.std(axis=0).mean():.6f}")
-print(f"   X_val_norm: mean={X_val_norm.mean(axis=0).mean():.6f}, std={X_val_norm.std(axis=0).mean():.6f}")
-
-# Save normalized data
-print("\n4. Saving normalized data...")
-np.save('X_train.npy', X_train_norm)
-np.save('X_val.npy', X_val_norm)
-np.save('y_train.npy', y_train)
-np.save('y_val.npy', y_val)
-
-# Also save normalization parameters (needed for prediction later)
-np.save('train_mean.npy', train_mean)
-np.save('train_std.npy', train_std)
-
-print("   Saved files:")
-print("      - X_train.npy (normalized training features)")
-print("      - X_val.npy (normalized validation features)")
-print("      - y_train.npy (training labels)")
-print("      - y_val.npy (validation labels)")
-print("      - train_mean.npy (mean for normalization)")
-print("      - train_std.npy (std for normalization)")
-
-print("\n" + "=" * 60)
-print("STEP 2 COMPLETED!")
-print("=" * 60)
-print("\nNext step: Implement MLP architecture and training")
-
+if __name__ == '__main__':
+    main()

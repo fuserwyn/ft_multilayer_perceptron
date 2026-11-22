@@ -1,174 +1,78 @@
 """
-Prediction Script
-Step 4: Make predictions on new data using trained MLP
+Program 3/3: load a trained model, predict on a given dataset and evaluate
+the predictions with the binary cross-entropy error function
+
+    E = -1/N * sum[ y_n log p_n + (1 - y_n) log(1 - p_n) ]
+
+where p_n is the predicted probability that example n is malignant (M).
+
+    python3 predict.py --model saved_model.npz --dataset data_valid.csv
 """
 
+import argparse
+import sys
+
 import numpy as np
-import pandas as pd
 
-print("=" * 60)
-print("STEP 4: PREDICTIONS")
-print("=" * 60)
+from mlp import CLASSES, FEATURES, MLP, binary_crossentropy, read_csv
 
-# Load normalization parameters
-print("\n1. Loading normalization parameters...")
-train_mean = np.load('train_mean.npy')
-train_std = np.load('train_std.npy')
-print("   Loaded train_mean and train_std")
 
-# Load model
-print("\n2. Loading trained MLP model...")
-model_data = np.load('mlp_model.npz', allow_pickle=True)
-# Extract weights and biases from npz file
-num_layers = len([k for k in model_data.keys() if k.startswith('weights_')])
-weights = [model_data[f'weights_{i}'] for i in range(num_layers)]
-biases = [model_data[f'biases_{i}'] for i in range(num_layers)]
-print("   Model loaded successfully")
+def main():
+    parser = argparse.ArgumentParser(description='Predict with a trained multilayer perceptron.')
+    parser.add_argument('--model', default='saved_model.npz', help='default: saved_model.npz')
+    parser.add_argument('--dataset', default='data_valid.csv', help='default: data_valid.csv')
+    parser.add_argument('--output', help='optional CSV file to write the predictions to')
+    parser.add_argument('--verbose', '-v', action='store_true', help='print every prediction')
+    args = parser.parse_args()
 
-# MLP class (same as in train_mlp.py)
-class MLP:
-    def __init__(self, weights, biases):
-        self.weights = weights
-        self.biases = biases
-    
-    def sigmoid(self, x):
-        x = np.clip(x, -500, 500)
-        return 1 / (1 + np.exp(-x))
-    
-    def forward(self, X):
-        activations = [X]
-        
-        # Hidden layers
-        for i in range(len(self.weights) - 1):
-            z = np.dot(activations[-1], self.weights[i]) + self.biases[i]
-            a = self.sigmoid(z)
-            activations.append(a)
-        
-        # Output layer
-        z = np.dot(activations[-1], self.weights[-1]) + self.biases[-1]
-        output = self.sigmoid(z)
-        
-        return output
-    
-    def predict(self, X, threshold=0.5):
-        """Make predictions"""
-        output = self.forward(X)
-        return (output >= threshold).astype(int).flatten()
-    
-    def predict_proba(self, X):
-        """Return prediction probabilities"""
-        return self.forward(X).flatten()
-    
-    def compute_binary_cross_entropy(self, y_true, y_pred):
-        """
-        Binary cross-entropy error function as specified in the assignment:
-        E = -1/N * sum[y_n * log(p_n) + (1-y_n) * log(1-p_n)]
-        """
-        N = len(y_true)
-        # Clip predictions to avoid log(0)
-        y_pred = np.clip(y_pred, 1e-15, 1 - 1e-15)
-        y_true = y_true.reshape(-1, 1) if len(y_true.shape) == 1 else y_true
-        y_pred = y_pred.reshape(-1, 1) if len(y_pred.shape) == 1 else y_pred
-        
-        error = -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
-        return error
+    try:
+        model = MLP.load(args.model)
+        df = read_csv(args.dataset)
+    except (OSError, ValueError, KeyError) as e:
+        sys.exit(f'error: {e}')
 
-# Initialize model
-mlp = MLP(weights, biases)
+    X = df[FEATURES].to_numpy(dtype=float)
+    y = (df['diagnosis'] == 'M').to_numpy(dtype=int)
 
-# Column names (same as in other scripts)
-columns = [
-    'id', 'diagnosis',
-    'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean', 'smoothness_mean',
-    'compactness_mean', 'concavity_mean', 'concave_points_mean', 'symmetry_mean',
-    'fractal_dimension_mean',
-    'radius_se', 'texture_se', 'perimeter_se', 'area_se', 'smoothness_se',
-    'compactness_se', 'concavity_se', 'concave_points_se', 'symmetry_se',
-    'fractal_dimension_se',
-    'radius_worst', 'texture_worst', 'perimeter_worst', 'area_worst',
-    'smoothness_worst', 'compactness_worst', 'concavity_worst',
-    'concave_points_worst', 'symmetry_worst', 'fractal_dimension_worst'
-]
+    proba = model.predict_proba(X)       # (m, 2): [P(B), P(M)]
+    p_malignant = proba[:, 1]
+    pred = proba.argmax(axis=1)
 
-# Feature columns (excluding id and diagnosis)
-feature_columns = [col for col in columns if col not in ['id', 'diagnosis']]
+    print(f"model   : {args.model}  ({' -> '.join(map(str, model.layer_sizes))})")
+    print(f'dataset : {args.dataset}  ({len(X)} examples)')
 
-def predict_from_csv(csv_path):
-    """Make predictions from a CSV file"""
-    print(f"\n3. Loading data from {csv_path}...")
-    df = pd.read_csv(csv_path, header=None, names=columns)
-    
-    # Extract features
-    X = df[feature_columns].values
-    
-    print(f"   Loaded {len(X)} samples")
-    
-    # Normalize features
-    print("   Normalizing features...")
-    X_norm = (X - train_mean) / train_std
-    
-    # Make predictions
-    print("   Making predictions...")
-    predictions = mlp.predict(X_norm)
-    probabilities = mlp.predict_proba(X_norm)
-    
-    # Create results dataframe
-    results = df[['id']].copy()
-    results['predicted_diagnosis'] = ['M' if p == 1 else 'B' for p in predictions]
-    results['probability'] = probabilities
-    results['confidence'] = np.maximum(probabilities, 1 - probabilities) * 100
-    
-    return results
+    if args.verbose:
+        for i, (truth, guess, p) in enumerate(zip(y, pred, p_malignant)):
+            mark = 'ok' if truth == guess else 'WRONG'
+            print(f'  {df["id"].iloc[i]:>10}  true={CLASSES[truth]}  pred={CLASSES[guess]}'
+                  f'  P(M)={p:.4f}  {mark}')
 
-def predict_single_sample(features):
-    """
-    Make prediction for a single sample
-    
-    Args:
-        features: numpy array of shape (30,) with feature values
-    
-    Returns:
-        dict with prediction, probability, and diagnosis
-    """
-    # Normalize
-    features_norm = (features.reshape(1, -1) - train_mean) / train_std
-    
-    # Predict
-    prob = mlp.predict_proba(features_norm)[0]
-    pred = mlp.predict(features_norm)[0]
-    
-    return {
-        'diagnosis': 'M' if pred == 1 else 'B',
-        'probability': prob,
-        'confidence': max(prob, 1 - prob) * 100
-    }
+    tp = int(np.sum((pred == 1) & (y == 1)))
+    tn = int(np.sum((pred == 0) & (y == 0)))
+    fp = int(np.sum((pred == 1) & (y == 0)))
+    fn = int(np.sum((pred == 0) & (y == 1)))
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
-# Example: Predict on validation set
-print("\n4. Example: Predicting on validation set...")
-X_val = np.load('X_val.npy')
-y_val = np.load('y_val.npy')
+    print()
+    print(f'binary cross-entropy : {binary_crossentropy(y, p_malignant):.4f}')
+    print(f'accuracy             : {np.mean(pred == y):.4f}  ({int(np.sum(pred == y))}/{len(y)})')
+    print(f'precision (M)        : {precision:.4f}')
+    print(f'recall    (M)        : {recall:.4f}')
+    print(f'f1-score  (M)        : {f1:.4f}')
+    print()
+    print('confusion matrix     pred B  pred M')
+    print(f'             true B  {tn:>6}  {fp:>6}')
+    print(f'             true M  {fn:>6}  {tp:>6}')
 
-val_predictions = mlp.predict(X_val)
-val_probabilities = mlp.predict_proba(X_val)
-val_accuracy = np.mean(val_predictions == y_val)
+    if args.output:
+        out = df[['id', 'diagnosis']].copy()
+        out['prediction'] = [CLASSES[i] for i in pred]
+        out['p_malignant'] = p_malignant
+        out.to_csv(args.output, index=False)
+        print(f"\n> predictions written to '{args.output}'")
 
-# Compute binary cross-entropy error as required by assignment
-val_bce = mlp.compute_binary_cross_entropy(y_val, val_probabilities)
 
-print(f"   Validation Accuracy: {val_accuracy:.4f} ({val_accuracy*100:.2f}%)")
-print(f"   Binary Cross-Entropy Error: {val_bce:.4f}")
-print(f"\n   Sample predictions (first 10):")
-for i in range(min(10, len(val_predictions))):
-    true_label = 'M' if y_val[i] == 1 else 'B'
-    pred_label = 'M' if val_predictions[i] == 1 else 'B'
-    prob = val_probabilities[i]
-    correct = "✓" if val_predictions[i] == y_val[i] else "✗"
-    print(f"      Sample {i+1}: True={true_label}, Pred={pred_label}, "
-          f"Prob={prob:.3f} {correct}")
-
-print("\n" + "=" * 60)
-print("PREDICTION SCRIPT READY!")
-print("=" * 60)
-print("\nUsage:")
-print("  - predict_from_csv('data.csv') - predict from CSV file")
-print("  - predict_single_sample(features) - predict single sample")
+if __name__ == '__main__':
+    main()
