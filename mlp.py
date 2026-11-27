@@ -116,6 +116,21 @@ def binary_crossentropy(y, p):
     return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
 
 
+def binary_metrics(y, pred):
+    """Precision, recall and F1 for the positive class (M = 1), plus the confusion counts."""
+    y = np.asarray(y).astype(int)
+    pred = np.asarray(pred).astype(int)
+    tp = int(np.sum((pred == 1) & (y == 1)))
+    tn = int(np.sum((pred == 0) & (y == 0)))
+    fp = int(np.sum((pred == 1) & (y == 0)))
+    fn = int(np.sum((pred == 0) & (y == 1)))
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return {'tp': tp, 'tn': tn, 'fp': fp, 'fn': fn,
+            'precision': precision, 'recall': recall, 'f1': f1}
+
+
 LOSSES = {
     'categoricalCrossentropy': categorical_crossentropy,
 }
@@ -138,6 +153,7 @@ def init_weights(name, n_in, n_out, rng):
 
 
 WEIGHT_INITS = ['heUniform', 'heNormal', 'xavierUniform']
+OPTIMIZERS = ['sgd', 'adam']
 
 
 # ---------------------------------------------------------------------------
@@ -147,14 +163,18 @@ WEIGHT_INITS = ['heUniform', 'heNormal', 'xavierUniform']
 class MLP:
     """Fully connected network: hidden layers use `activation`, output uses softmax."""
 
-    def __init__(self, layer_sizes, activation='sigmoid', weights_init='heUniform', seed=42):
+    def __init__(self, layer_sizes, activation='sigmoid', weights_init='heUniform', seed=42,
+                 optimizer='sgd'):
         if len(layer_sizes) < 3:
             raise ValueError("need at least an input, one hidden and an output layer")
         if activation not in ACTIVATIONS:
             raise ValueError(f"unknown activation '{activation}'")
+        if optimizer not in OPTIMIZERS:
+            raise ValueError(f"unknown optimizer '{optimizer}'")
         self.layer_sizes = list(layer_sizes)
         self.activation = activation
         self.weights_init = weights_init
+        self.optimizer = optimizer
         self.act, self.act_prime = ACTIVATIONS[activation]
 
         rng = np.random.default_rng(seed)
@@ -223,10 +243,40 @@ class MLP:
     # --- gradient descent --------------------------------------------------
 
     def step(self, dW, db, learning_rate):
-        """Move every parameter a small step against its gradient."""
+        """Move every parameter a small step against its gradient.
+
+        sgd is plain gradient descent: W ← W − lr · dW.
+        adam keeps a moving average of the gradient (m) and of its square (v),
+        corrects the bias from starting at zero, then steps by lr · m̂ / (√v̂ + ε).
+        """
+        if self.optimizer == 'adam':
+            self._adam_step(dW, db, learning_rate)
+            return
         for l in range(len(self.W)):
             self.W[l] -= learning_rate * dW[l]
             self.b[l] -= learning_rate * db[l]
+
+    def _adam_step(self, dW, db, learning_rate, beta1=0.9, beta2=0.999, eps=1e-8):
+        if not getattr(self, '_adam_ready', False):
+            self._adam_t = 0
+            self._mW = [np.zeros_like(W) for W in self.W]
+            self._vW = [np.zeros_like(W) for W in self.W]
+            self._mb = [np.zeros_like(b) for b in self.b]
+            self._vb = [np.zeros_like(b) for b in self.b]
+            self._adam_ready = True
+        self._adam_t += 1
+        t = self._adam_t
+        for l in range(len(self.W)):
+            self._mW[l] = beta1 * self._mW[l] + (1.0 - beta1) * dW[l]
+            self._vW[l] = beta2 * self._vW[l] + (1.0 - beta2) * (dW[l] ** 2)
+            self._mb[l] = beta1 * self._mb[l] + (1.0 - beta1) * db[l]
+            self._vb[l] = beta2 * self._vb[l] + (1.0 - beta2) * (db[l] ** 2)
+            mW = self._mW[l] / (1.0 - beta1 ** t)
+            vW = self._vW[l] / (1.0 - beta2 ** t)
+            mb = self._mb[l] / (1.0 - beta1 ** t)
+            vb = self._vb[l] / (1.0 - beta2 ** t)
+            self.W[l] -= learning_rate * mW / (np.sqrt(vW) + eps)
+            self.b[l] -= learning_rate * mb / (np.sqrt(vb) + eps)
 
     # --- inference ---------------------------------------------------------
 
@@ -245,6 +295,7 @@ class MLP:
             'activation': self.activation,
             'output_activation': 'softmax',
             'weights_init': self.weights_init,
+            'optimizer': self.optimizer,
             'classes': CLASSES,
             'features': FEATURES,
             'training': extra or {},
@@ -260,7 +311,8 @@ class MLP:
     def load(cls, path):
         data = np.load(path, allow_pickle=False)
         topology = json.loads(str(data['topology']))
-        model = cls(topology['layer_sizes'], topology['activation'], topology['weights_init'])
+        model = cls(topology['layer_sizes'], topology['activation'], topology['weights_init'],
+                    optimizer=topology.get('optimizer', 'sgd'))
         model.W = [data[f'W{l}'] for l in range(len(model.W))]
         model.b = [data[f'b{l}'] for l in range(len(model.b))]
         model.mean = data['mean']

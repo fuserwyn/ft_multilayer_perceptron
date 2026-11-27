@@ -7,7 +7,7 @@ tumours as malignant (**M**) or benign (**B**) using the Wisconsin Breast Cancer
 
 | file | purpose |
 |---|---|
-| `mlp.py` | core: activations, softmax, losses, `MLP` class (feedforward, backprop, gradient descent, save/load) |
+| `mlp.py` | core: activations, softmax, losses, `MLP` class (feedforward, backprop, gradient descent / Adam, save/load) |
 | `split_data.py` | **program 1**: splits `data.csv` into `data_train.csv` and `data_valid.csv` (stratified, seeded) |
 | `train_mlp.py` | **program 2**: trains the model, prints metrics every epoch, saves the model, shows the learning curves |
 | `predict.py` | **program 3**: loads the model, predicts on a given CSV and computes the binary cross-entropy |
@@ -30,9 +30,25 @@ The architecture and hyper-parameters are set with arguments (at least 2 hidden 
 python3 train_mlp.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy \
                      --batch_size 8 --learning_rate 0.0314 --activation sigmoid
 # --activation sigmoid|tanh|relu   --weights_init heUniform|heNormal|xavierUniform
+# --optimizer sgd|adam            --early_stopping 15
 # --no_show   save the plot without opening a window
 make train ARGS="--layer 32 16 --activation relu"
 ```
+
+Bonus flags, off unless you ask for them:
+
+```bash
+# Adam instead of plain gradient descent. Use a smaller learning rate.
+python3 train_mlp.py --optimizer adam --learning_rate 0.001 --no_show --history run_adam.csv
+
+# Stop when the validation loss stalls, and save the weights from the best epoch.
+python3 train_mlp.py --early_stopping 15
+
+# Draw an earlier run on the same loss and accuracy graphs.
+python3 train_mlp.py --no_show --compare run_adam.csv
+```
+
+Each epoch is also written to `training_history.csv` (loss, accuracy, precision, recall and F1, on the training set and on the validation set).
 
 `predict.py -v` prints every prediction, and `--output preds.csv` writes them to a file.
 
@@ -82,7 +98,10 @@ dZ    = dA ⊙ f'(Z[l-1])        multiply by the activation derivative
 `test_gradient_check` verifies the gradients against `(L(w+ε) − L(w−ε)) / 2ε`.
 
 ### Gradient descent (`MLP.step` + the loop in `train_mlp.py`)
-`W ← W − lr · dW`, `b ← b − lr · db`. The gradient points towards increasing error, so we step the opposite way.
+`W ← W − lr · dW`, `b ← b − lr · db`. The gradient points towards increasing error, so we step the opposite way. This is the default (`--optimizer sgd`).
+
+Adam (`--optimizer adam`) keeps two moving averages: `m` of the gradient and `v` of its square. Both start at 0, so they are bias-corrected (`m̂ = m / (1 − β1^t)`), and the step is `lr · m̂ / (√v̂ + ε)`. A learning rate around 0.001 is the stable one. The moments are not part of the saved model: prediction only needs the weights.
+
 Training uses **mini-batches**: each epoch the data is shuffled and cut into batches of `batch_size`, and the weights are updated after every batch.
 - If `lr` is too large, training diverges or oscillates; if it is too small, training is slow.
 - An epoch is one full pass over the training set.
@@ -93,3 +112,5 @@ Training uses **mini-batches**: each epoch the data is shuffled and cut into bat
 - **Why normalise?** Features have very different scales (area ~1000, smoothness ~0.1), which unbalances the gradients. mean and std come from the training set only, otherwise information from the validation set leaks into the model.
 - **Why a validation set?** To measure performance on data the model has never seen. If the training loss keeps falling while the validation loss rises, the model is overfitting.
 - **Why softmax?** It turns the output into a probability distribution (non-negative, sums to 1), and combined with cross-entropy it gives the simple gradient `P − Y`.
+- **What is early stopping?** If `--early_stopping 15` is set and the validation loss does not improve for 15 epochs, training stops and the weights from the best epoch are restored. That is the point before the model starts fitting the training set more tightly than the validation set.
+- **Where is the history?** Every epoch is appended to `training_history.csv`. `--compare other.csv` draws that run on the same loss and accuracy graphs.

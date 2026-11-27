@@ -14,7 +14,7 @@ import sys
 
 import numpy as np
 
-from mlp import CLASSES, FEATURES, MLP, binary_crossentropy, read_csv
+from mlp import CLASSES, FEATURES, MLP, binary_crossentropy, binary_metrics, read_csv
 
 
 def main():
@@ -47,13 +47,9 @@ def main():
             print(f'  {df["id"].iloc[i]:>10}  true={CLASSES[truth]}  pred={CLASSES[guess]}'
                   f'  P(M)={p:.4f}  {mark}')
 
-    tp = int(np.sum((pred == 1) & (y == 1)))
-    tn = int(np.sum((pred == 0) & (y == 0)))
-    fp = int(np.sum((pred == 1) & (y == 0)))
-    fn = int(np.sum((pred == 0) & (y == 1)))
-    precision = tp / (tp + fp) if tp + fp else 0.0
-    recall = tp / (tp + fn) if tp + fn else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    m = binary_metrics(y, pred)
+    tp, tn, fp, fn = m['tp'], m['tn'], m['fp'], m['fn']
+    precision, recall, f1 = m['precision'], m['recall'], m['f1']
 
     print()
     print(f'binary cross-entropy : {binary_crossentropy(y, p_malignant):.4f}')

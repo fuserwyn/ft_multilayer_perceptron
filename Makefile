@@ -42,7 +42,7 @@ test:
 	$(PYTHON) test_mlp.py
 
 clean:
-	rm -rf __pycache__ learning_curves.png
+	rm -rf __pycache__ learning_curves.png training_history.csv
 
 fclean: clean
 	rm -f $(TRAIN_CSV) $(VALID_CSV) $(MODEL)
@@ -54,6 +54,7 @@ help:
 	@echo "make explore   print a quick analysis of the dataset"
 	@echo "make split     data.csv -> data_train.csv + data_valid.csv"
 	@echo "make train     train and save saved_model.npz   (ARGS='--layer 24 24 24 --epochs 84')"
+	@echo "               bonus: ARGS='--optimizer adam --learning_rate 0.001 --early_stopping 15'"
 	@echo "make predict   evaluate the model on data_valid.csv"
 	@echo "make test      unit tests + gradient check"
 	@echo "make fclean    remove every generated file"

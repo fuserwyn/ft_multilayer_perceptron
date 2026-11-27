@@ -13,7 +13,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from mlp import (MLP, binary_crossentropy, categorical_crossentropy, one_hot,  # noqa: E402
+from mlp import (MLP, binary_crossentropy, binary_metrics, categorical_crossentropy, one_hot,  # noqa: E402
                  sigmoid, sigmoid_prime, softmax)
 
 
@@ -93,6 +93,30 @@ def test_training_reduces_loss():
     for _ in range(300):
         model.forward(Xn)
         model.step(*model.backward(Y), learning_rate=0.5)
+    after = categorical_crossentropy(Y, model.forward(Xn))
+    assert after < before / 3, (before, after)
+    assert np.mean(model.predict(X) == y) > 0.95
+
+
+def test_binary_metrics():
+    m = binary_metrics([1, 1, 0, 0], [1, 0, 1, 0])
+    assert (m['tp'], m['fn'], m['fp'], m['tn']) == (1, 1, 1, 1)
+    assert abs(m['precision'] - 0.5) < 1e-12 and abs(m['recall'] - 0.5) < 1e-12
+    assert abs(m['f1'] - 0.5) < 1e-12
+
+
+def test_adam_reduces_loss():
+    rng = np.random.default_rng(2)
+    X = rng.normal(size=(200, 2))
+    y = (X[:, 0] + X[:, 1] > 0).astype(int)
+    Y = one_hot(y)
+    model = MLP([2, 8, 8, 2], optimizer='adam', seed=2)
+    model.fit_normalization(X)
+    Xn = model.normalize(X)
+    before = categorical_crossentropy(Y, model.forward(Xn))
+    for _ in range(80):
+        model.forward(Xn)
+        model.step(*model.backward(Y), learning_rate=0.05)
     after = categorical_crossentropy(Y, model.forward(Xn))
     assert after < before / 3, (before, after)
     assert np.mean(model.predict(X) == y) > 0.95
