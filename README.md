@@ -3,32 +3,31 @@
 A multilayer perceptron written from scratch with numpy. It classifies breast
 tumours as malignant (**M**) or benign (**B**) using the Wisconsin Breast Cancer dataset.
 
-## Files
+## Layout
 
-| file | purpose |
-|---|---|
-| `mlp.py` | core: activations, softmax, losses, `MLP` class (feedforward, backprop, gradient descent / Adam, save/load) |
-| `split_data.py` | **program 1**: splits `data.csv` into `data_train.csv` and `data_valid.csv` (stratified, seeded) |
-| `train_mlp.py` | **program 2**: trains the model, prints metrics every epoch, saves the model, shows the learning curves |
-| `predict.py` | **program 3**: loads the model, predicts on a given CSV and computes the binary cross-entropy |
-| `prepare_data.py` | dataset exploration (optional) |
-| `test_mlp.py` | unit tests, including a numerical gradient check |
+| layer | path | purpose |
+|---|---|---|
+| data | `data/` | the raw dataset, and the train/validation split |
+| domain | `mlp/` | classes: `Dataset`, `DenseLayer`, `Sigmoid`/`ReLU`/`Tanh`/`Softmax`, `SGD`/`Adam`, `MLP`, `Trainer` |
+| application | `app/` | `DataSplitter`, `TrainingProgram`, `Predictor` |
+| tests | `tests/` | unit tests, including a numerical gradient check |
+| docs | `docs/` | the subject |
 
 ## Usage
 
 ```bash
 make install        # numpy, pandas, matplotlib
-make split          # or: python3 split_data.py --dataset data.csv --valid_ratio 0.2 --seed 42
-make train          # or: python3 train_mlp.py
-make predict        # or: python3 predict.py --model saved_model.npz --dataset data_valid.csv
+make split          # or: python3 app/split_data.py --dataset data/data.csv --valid_ratio 0.2 --seed 42
+make train          # or: python3 app/train_mlp.py
+make predict        # or: python3 app/predict.py --model saved_model.npz --dataset data/data_valid.csv
 make test
 ```
 
 The architecture and hyper-parameters are set with arguments (at least 2 hidden layers):
 
 ```bash
-python3 train_mlp.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy \
-                     --batch_size 8 --learning_rate 0.0314 --activation sigmoid
+python3 app/train_mlp.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy \
+                         --batch_size 8 --learning_rate 0.0314 --activation sigmoid
 # --activation sigmoid|tanh|relu   --weights_init heUniform|heNormal|xavierUniform
 # --optimizer sgd|adam            --early_stopping 15
 # --no_show   save the plot without opening a window
@@ -39,18 +38,18 @@ Bonus flags, off unless you ask for them:
 
 ```bash
 # Adam instead of plain gradient descent. Use a smaller learning rate.
-python3 train_mlp.py --optimizer adam --learning_rate 0.001 --no_show --history run_adam.csv
+python3 app/train_mlp.py --optimizer adam --learning_rate 0.001 --no_show --history run_adam.csv
 
 # Stop when the validation loss stalls, and save the weights from the best epoch.
-python3 train_mlp.py --early_stopping 15
+python3 app/train_mlp.py --early_stopping 15
 
 # Draw an earlier run on the same loss and accuracy graphs.
-python3 train_mlp.py --no_show --compare run_adam.csv
+python3 app/train_mlp.py --no_show --compare run_adam.csv
 ```
 
 Each epoch is also written to `training_history.csv` (loss, accuracy, precision, recall and F1, on the training set and on the validation set).
 
-`predict.py -v` prints every prediction, and `--output preds.csv` writes them to a file.
+`python3 app/predict.py -v` prints every prediction, and `--output preds.csv` writes them to a file.
 
 ### What `saved_model.npz` contains
 - the topology: layer sizes, hidden activation, softmax output, weight initialiser, classes;
@@ -97,10 +96,10 @@ dZ    = dA ⊙ f'(Z[l-1])        multiply by the activation derivative
 ```
 `test_gradient_check` verifies the gradients against `(L(w+ε) − L(w−ε)) / 2ε`.
 
-### Gradient descent (`MLP.step` + the loop in `train_mlp.py`)
-`W ← W − lr · dW`, `b ← b − lr · db`. The gradient points towards increasing error, so we step the opposite way. This is the default (`--optimizer sgd`).
+### Gradient descent (`SGD.step`, called from `MLP.step`)
+`W ← W − lr · dW`, `b ← b − lr · db`. The gradient points towards increasing error, so the step goes the opposite way. This is the default (`--optimizer sgd`). `Trainer` runs it once per mini-batch.
 
-Adam (`--optimizer adam`) keeps two moving averages: `m` of the gradient and `v` of its square. Both start at 0, so they are bias-corrected (`m̂ = m / (1 − β1^t)`), and the step is `lr · m̂ / (√v̂ + ε)`. A learning rate around 0.001 is the stable one. The moments are not part of the saved model: prediction only needs the weights.
+Adam (`--optimizer adam`, class `Adam`) keeps two moving averages: `m` of the gradient and `v` of its square. Both start at 0, so they are bias-corrected (`m̂ = m / (1 − β1^t)`), and the step is `lr · m̂ / (√v̂ + ε)`. A learning rate around 0.001 is the stable one. The moments are not part of the saved model: prediction only needs the weights.
 
 Training uses **mini-batches**: each epoch the data is shuffled and cut into batches of `batch_size`, and the weights are updated after every batch.
 - If `lr` is too large, training diverges or oscillates; if it is too small, training is slow.
