@@ -1,12 +1,3 @@
-"""
-Program 2/3: train the multilayer perceptron with backpropagation and
-mini-batch gradient descent, then save the model (topology + weights +
-normalisation) and display the learning curves.
-
-    python3 app/train_mlp.py --layer 24 24 24 --epochs 84 --loss categoricalCrossentropy \
-                             --batch_size 8 --learning_rate 0.0314
-"""
-
 import argparse
 import sys
 from pathlib import Path
@@ -17,39 +8,43 @@ from mlp import ACTIVATIONS, LOSSES, MLP, OPTIMIZERS, WEIGHT_INITS, Dataset, Lea
 
 
 class TrainingProgram:
-    """Build a network from the arguments, train it, save it, draw the curves."""
-
     def __init__(self, args):
         self.args = args
 
-    def run(self):
-        args = self.args
+    def load_sets(self):
         try:
-            train = Dataset.read(args.train)
-            valid = Dataset.read(args.valid)
+            train = Dataset.read(self.args.train)
+            valid = Dataset.read(self.args.valid)
         except (OSError, ValueError) as e:
             sys.exit(f'error: {e}\n(run app/split_data.py first)')
+        print(f'x_train shape : {train.X.shape}')
+        print(f'x_valid shape : {valid.X.shape}')
+        return train, valid
 
-        X_train, y_train = train.X, train.y
-        X_valid, y_valid = valid.X, valid.y
-        Y_train, Y_valid = Dataset.encode(y_train), Dataset.encode(y_valid)
-        print(f'x_train shape : {X_train.shape}')
-        print(f'x_valid shape : {X_valid.shape}')
-
+    def warn_learning_rate(self):
+        args = self.args
         if args.optimizer == 'adam' and args.learning_rate > 0.01:
             print(f'warning: Adam is usually stable around --learning_rate 0.001 '
                   f'(got {args.learning_rate})')
 
+    def build_model(self, X_train):
+        args = self.args
         layer_sizes = [X_train.shape[1]] + args.layer + [2]
         model = MLP(layer_sizes, args.activation, args.weights_init, args.seed, args.optimizer)
         model.fit_normalization(X_train)
         print(f'network       : {" -> ".join(map(str, layer_sizes))}  '
               f'({args.activation} hidden, softmax output, {args.weights_init}, {args.optimizer})')
+        return model
 
+    def train(self, model, train, valid):
+        args = self.args
         trainer = Trainer(model, LOSSES[args.loss], args.learning_rate, args.batch_size,
                           args.seed, args.epochs, args.early_stopping)
-        history = trainer.fit(X_train, Y_train, X_valid, Y_valid)
+        history = trainer.fit(train.X, Dataset.encode(train.y), valid.X, Dataset.encode(valid.y))
+        return trainer, history
 
+    def save_results(self, model, trainer, history):
+        args = self.args
         model.save(args.model, extra={k: v for k, v in vars(args).items()
                                       if k in ('epochs', 'loss', 'batch_size', 'learning_rate', 'seed',
                                                'optimizer', 'early_stopping')})
@@ -64,6 +59,13 @@ class TrainingProgram:
             LearningCurves(history, args.compare, best).save(args.plot, show=not args.no_show)
         except (OSError, ValueError) as e:
             sys.exit(f'error: {e}')
+
+    def run(self):
+        train, valid = self.load_sets()
+        self.warn_learning_rate()
+        model = self.build_model(train.X)
+        trainer, history = self.train(model, train, valid)
+        self.save_results(model, trainer, history)
 
     @classmethod
     def parse(cls):

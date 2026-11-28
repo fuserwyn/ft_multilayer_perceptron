@@ -1,11 +1,7 @@
-"""Loss classes and the classification metrics used during training."""
-
 import numpy as np
 
 
 class CategoricalCrossentropy:
-    """Mean over the batch of -sum_k Y_k log P_k."""
-
     EPS = 1e-15
 
     def __call__(self, Y, P):
@@ -14,8 +10,6 @@ class CategoricalCrossentropy:
 
 
 class BinaryCrossentropy:
-    """E = -1/N sum[ y log p + (1 - y) log(1 - p) ], y in {0, 1}, p = P(class 1)."""
-
     EPS = 1e-15
 
     def __call__(self, y, p):
@@ -29,8 +23,6 @@ LOSSES = {
 
 
 class Metrics:
-    """Precision, recall and F1 for the positive class (M = 1), plus the confusion counts."""
-
     def __init__(self, y, pred):
         y = np.asarray(y).astype(int)
         pred = np.asarray(pred).astype(int)

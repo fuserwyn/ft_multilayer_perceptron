@@ -1,10 +1,3 @@
-"""
-Checks for the network classes. The important one compares backpropagation
-with a numerical derivative (f(w+e) - f(w-e)) / 2e.
-
-    python3 tests/test_mlp.py
-"""
-
 import os
 import sys
 import tempfile
@@ -18,8 +11,6 @@ from mlp import (MLP, BinaryCrossentropy, CategoricalCrossentropy, Dataset, Metr
 
 
 class GradientCheck:
-    """Compare analytic gradients with a central finite difference."""
-
     def __init__(self, activation):
         self.activation = activation
         self.loss = CategoricalCrossentropy()
@@ -50,8 +41,6 @@ class GradientCheck:
 
 
 class TestSuite:
-    """One method per check. `run` prints which ones passed."""
-
     def activations(self):
         sigmoid = Sigmoid()
         assert abs(sigmoid(0.0) - 0.5) < 1e-12

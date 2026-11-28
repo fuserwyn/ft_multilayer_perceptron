@@ -1,11 +1,7 @@
-"""Activation classes. Each one is f(z), and f'(z) for the hidden layers."""
-
 import numpy as np
 
 
 class Activation:
-    """f(z) via the instance itself, f'(z) via derivative()."""
-
     def __call__(self, z):
         raise NotImplementedError
 
@@ -39,12 +35,6 @@ class Tanh(Activation):
 
 
 class Softmax(Activation):
-    """Row-wise softmax. Subtracting the row max avoids overflow in exp.
-
-    Combined with cross-entropy, the backward step uses (P - Y) directly,
-    so this class has no separate derivative.
-    """
-
     def __call__(self, z):
         e = np.exp(z - z.max(axis=1, keepdims=True))
         return e / e.sum(axis=1, keepdims=True)

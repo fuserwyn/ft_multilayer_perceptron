@@ -1,5 +1,3 @@
-"""The multilayer perceptron: a stack of dense layers plus a normaliser."""
-
 import json
 
 import numpy as np
@@ -12,8 +10,6 @@ from .optimizers import OPTIMIZERS
 
 
 class Normalizer:
-    """Z-score. mean and std are learned on the training set only."""
-
     def __init__(self, n_features):
         self.mean = np.zeros(n_features)
         self.std = np.ones(n_features)
@@ -28,8 +24,6 @@ class Normalizer:
 
 
 class MLP:
-    """Fully connected network. Hidden layers share one activation; the output is softmax."""
-
     def __init__(self, layer_sizes, activation='sigmoid', weights_init='heUniform', seed=42,
                  optimizer='sgd'):
         if len(layer_sizes) < 3:
@@ -92,31 +86,18 @@ class MLP:
         self.normalizer.std = value
 
     def fit_normalization(self, X):
-        """Learn z-score parameters from the training set only."""
         self.normalizer.fit(X)
 
     def normalize(self, X):
         return self.normalizer.transform(X)
 
     def forward(self, X):
-        """
-        Feedforward. X must already be normalised.
-        Each layer caches Z and A, because backprop needs them.
-        Returns the softmax output P of shape (m, n_classes).
-        """
         A = X
         for layer in self.layers:
             A = layer.forward(A)
         return A
 
     def backward(self, Y):
-        """
-        Backpropagation of the mean categorical cross-entropy.
-        Must be called right after forward() on the same batch.
-
-        Output layer: for softmax + cross-entropy, dL/dZ = (P - Y) / m.
-        Then each DenseLayer applies the chain rule down to the input.
-        """
         m = Y.shape[0]
         dZ = (self.layers[-1].A - Y) / m
         dW = [None] * len(self.layers)
@@ -130,11 +111,9 @@ class MLP:
         return dW, db
 
     def step(self, dW, db, learning_rate):
-        """Hand the gradients to the optimizer (SGD or Adam)."""
         self.optimizer.step(self.layers, dW, db, learning_rate)
 
     def predict_proba(self, X_raw):
-        """Raw (unnormalised) features -> class probabilities (m, n_classes)."""
         return self.forward(self.normalize(X_raw))
 
     def predict(self, X_raw):

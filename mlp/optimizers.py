@@ -1,11 +1,7 @@
-"""One step of learning. SGD is plain gradient descent; Adam is the bonus."""
-
 import numpy as np
 
 
 class SGD:
-    """W ← W − lr · dW. The gradient points uphill, so the step goes the other way."""
-
     def step(self, layers, dW, db, learning_rate):
         for layer, grad_w, grad_b in zip(layers, dW, db):
             layer.W -= learning_rate * grad_w
@@ -13,12 +9,6 @@ class SGD:
 
 
 class Adam:
-    """Moving averages of the gradient (m) and of its square (v).
-
-    Both start at 0, so they are bias-corrected, and the step is
-    lr · m̂ / (√v̂ + ε). The moments are not saved with the model.
-    """
-
     def __init__(self, beta1=0.9, beta2=0.999, eps=1e-8):
         self.beta1 = beta1
         self.beta2 = beta2

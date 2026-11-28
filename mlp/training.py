@@ -1,5 +1,3 @@
-"""The training loop: mini-batches, early stopping, the metric history, the curves."""
-
 import csv
 
 import numpy as np
@@ -8,8 +6,6 @@ from .losses import Metrics
 
 
 class EarlyStopping:
-    """Stop when the validation loss stalls, and remember the best weights."""
-
     def __init__(self, patience):
         self.patience = patience
         self.best = float('inf')
@@ -19,7 +15,6 @@ class EarlyStopping:
         self._b = None
 
     def update(self, epoch, val_loss, model):
-        """Return True when training should stop."""
         if val_loss < self.best:
             self.best = val_loss
             self.best_epoch = epoch
@@ -36,8 +31,6 @@ class EarlyStopping:
 
 
 class History:
-    """One row of metrics per epoch, and the csv it is written to."""
-
     def __init__(self):
         self.columns = {
             'epoch': [], 'loss': [], 'val_loss': [], 'acc': [], 'val_acc': [],
@@ -78,8 +71,6 @@ class History:
 
 
 class LearningCurves:
-    """The two graphs shown at the end of training: loss and accuracy."""
-
     def __init__(self, history, compare=None, best_epoch=None):
         self.history = history
         self.compare = compare or []
@@ -120,8 +111,6 @@ class LearningCurves:
 
 
 class Trainer:
-    """Mini-batch gradient descent, one epoch at a time, with an optional early stop."""
-
     def __init__(self, model, loss, learning_rate, batch_size, seed, epochs, early_stopping=0):
         self.model = model
         self.loss = loss

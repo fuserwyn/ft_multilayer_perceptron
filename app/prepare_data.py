@@ -1,5 +1,3 @@
-"""A short look at the raw dataset before training."""
-
 import sys
 from pathlib import Path
 
@@ -9,8 +7,6 @@ from mlp import Dataset  # noqa: E402
 
 
 class DatasetReport:
-    """Print the shape, the class balance and a few feature statistics."""
-
     def __init__(self, path):
         self.path = path
         self.dataset = Dataset.read(path)

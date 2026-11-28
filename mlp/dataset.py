@@ -1,12 +1,8 @@
-"""The data layer: one class that reads the Wisconsin file and can split it."""
-
 import numpy as np
 import pandas as pd
 
 
 class Dataset:
-    """A table of cell-nucleus measurements and a diagnosis, M or B."""
-
     FEATURES = [
         'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean', 'smoothness_mean',
         'compactness_mean', 'concavity_mean', 'concave_points_mean', 'symmetry_mean',
@@ -26,7 +22,6 @@ class Dataset:
 
     @classmethod
     def read(cls, path):
-        """Read a raw dataset file (no header, 32 columns)."""
         frame = pd.read_csv(path, header=None, names=cls.COLUMNS)
         bad = ~frame['diagnosis'].isin(cls.CLASSES)
         if bad.any():
@@ -36,17 +31,14 @@ class Dataset:
 
     @property
     def X(self):
-        """Features, shape (m, 30)."""
         return self.frame[self.FEATURES].to_numpy(dtype=float)
 
     @property
     def y(self):
-        """Integer labels, M -> 1, B -> 0."""
         return (self.frame['diagnosis'] == 'M').to_numpy(dtype=int)
 
     @staticmethod
     def encode(y, n_classes=2):
-        """One-hot labels, shape (m, n_classes)."""
         out = np.zeros((len(y), n_classes))
         out[np.arange(len(y)), y] = 1.0
         return out
@@ -55,7 +47,6 @@ class Dataset:
         return self.encode(self.y, n_classes)
 
     def stratified_split(self, valid_ratio, seed):
-        """Same M/B ratio in both parts. Returns (train, valid)."""
         rng = np.random.default_rng(seed)
         labels = self.frame['diagnosis'].to_numpy()
         train_idx, valid_idx = [], []

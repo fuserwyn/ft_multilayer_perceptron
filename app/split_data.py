@@ -1,13 +1,3 @@
-"""
-Program 1/3: split the raw dataset into a training part and a validation part.
-
-The split is stratified (same M/B ratio in both parts) and reproducible with --seed.
-Output files keep the original raw format (no header, 32 columns), so the
-normalisation is learned later, by the training program, on the training part only.
-
-    python3 app/split_data.py --dataset data/data.csv --valid_ratio 0.2 --seed 42
-"""
-
 import argparse
 import os
 import sys
@@ -19,8 +9,6 @@ from mlp import Dataset  # noqa: E402
 
 
 class DataSplitter:
-    """Cut one dataset into a training part and a validation part."""
-
     def __init__(self, valid_ratio=0.2, seed=42, out_dir='data'):
         self.valid_ratio = valid_ratio
         self.seed = seed

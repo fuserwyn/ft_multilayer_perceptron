@@ -1,5 +1,3 @@
-"""Domain layer: the dataset, the layers, and the training loop."""
-
 from .activations import ACTIVATIONS, ReLU, Sigmoid, Softmax, Tanh
 from .dataset import Dataset
 from .initializers import WEIGHT_INITS
